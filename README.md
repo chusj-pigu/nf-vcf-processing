@@ -26,7 +26,7 @@ Filtering VCF files is done with [bcftools], converting to a table is done with 
 - `--sample_id`: Name with which to prefix output files [default: "variants"].
 - `-profile`: Use drac if running on Narval [default: standard].
 - `--out_dir`: Path to the directory that will store output files [default: variants/]
-- `--pattern`: Usually not reqiuired. Path to a csv file containing type of event (cnv, fusion or translocation) as first column and pattern with which to filter ID field of VCF with as second column. This is usually not changed, default is stored in asstets of this project.
+- `--pattern`: Usually not reqiuired. Path to a csv file containing type of event (cnv, fusion or translocation) as first column and pattern with which to filter ID field of VCF with as second column. Default is stored in asstets of this project.
 - `--fields`: Usually not reqiuired. Path to a csv file containing type of event (cnv, fusion or translocation) as first column and fields to keep in VCF as subsequent elements. Default is stored in asstets of this project.
 
 ## Outputs
