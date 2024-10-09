@@ -39,33 +39,42 @@ workflow {
     all_vcf_ch = cnv_ch.mix(fusion_ch,transloc_ch)
 
     // Create a channel that will filter types of mutation that are enabled
-    all_types = all_vcf_ch
-        .map{ tuple -> tuple[0] }
+   // all_types = all_vcf_ch
+     //   .map{ tuple -> tuple[0] }
 
     // Pattern channel
     pattern_ch = Channel.fromPath(params.patterns)
         .splitCsv()
         .map { row -> tuple(row[0],row[1]) }
-        .join(all_types)  // Keep only types of mutations asked
 
     // Field channels
-    bcf_fields_ch = Channel.fromPath(params.fields)
+    gatk_fields_ch = Channel.fromPath(params.fields)
         .splitCsv()
         .map { row -> 
             def type = row[0]
-            def fields = row[1..-1].findAll { it }.collect { "%INFO/${it}" }
+            def fields = row[1..-1].findAll { it }.collect { "-F ${it}" }
             tuple(type, fields.join(' '))
         }
-        .join(all_types) // Keep only types of mutations asked
-
-    gatk_fields_ch = bcf_fields_ch
-        .map { type, fields ->
-            def new_fields = fields.replaceAll("%INFO/", "-F ")
-            tuple(type, new_fields)
-        }
-        .join(all_types) // Keep only types of mutations asked
+    
+    genes_ch = Channel.fromPath(params.gene_list)
 
     GREP_VCF(all_vcf_ch, pattern_ch) 
-    VCF_TO_TABLE(GREP_VCF.out.raw_vcf,GREP_VCF.out.final_vcf,bcf_fields_ch,gatk_fields_ch)
+    VCF_TO_TABLE(GREP_VCF.out.raw_vcf,GREP_VCF.out.final_vcf,gatk_fields_ch,genes_ch)
+
+    // Prints message to indicates which tables were processed :
+
+    types_processed = VCF_TO_TABLE.out.table
+        .map { tuple -> tuple[0] }   // Extract type field (assuming type is the first element in the tuple)
+        .unique()
+        .toList()
+    
+    if (!params.gene_list.endsWith('NO_FILE')) {
+    types_processed
+        .view { types ->
+            println "Selected genes were found for event type: ${types.join(', ')}"
+        }
+    } else {
+    println "No gene list provided, summary tables include all fusion, translocation and cnv events."
+    }
 
 }

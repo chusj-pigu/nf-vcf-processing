@@ -1,5 +1,4 @@
 include { bcf_filterIDs } from '../modules/bcftools'
-include { bcf_selectFields } from '../modules/bcftools'
 include { gatk_table } from '../modules/gatk'
 include { clean_cnvTable } from '../modules/rscripts'
 include { clean_fusionTable } from '../modules/rscripts'
@@ -10,16 +9,26 @@ workflow VCF_TO_TABLE {
     take:
     vcf_raw
     vcf_filt
-    fields_bcf
     fields_gatk
+    gene_file
 
     main:
-    bcf_filterIDs(vcf_raw, vcf_filt)
-    bcf_selectFields(bcf_filterIDs.out, fields_bcf)
-    table_ch = gatk_table(bcf_selectFields.out, fields_gatk)
-    clean_cnvTable(table_ch)
-    clean_fusionTable(table_ch)
-    clean_translocTable(table_ch)
+    vcf_ch = vcf_raw
+        .join(vcf_filt, by:0)
+    bcf_filt_ch = bcf_filterIDs(vcf_ch)
+        .join(fields_gatk, by:0)
+    table_ch = gatk_table(bcf_filt_ch)
+
+    cnv_ch = table_ch.filter { tuple -> tuple[0] == 'cnv' }
+    fusion_ch = table_ch.filter { tuple -> tuple[0] == 'fusion' }
+    transloc_ch = table_ch.filter { tuple -> tuple[0] == 'translocation' }
+
+    clean_cnvTable(cnv_ch, gene_file)
+    clean_fusionTable(fusion_ch, gene_file)
+    clean_translocTable(transloc_ch, gene_file)
+
+    emit:
+    table = table_ch
 
 }
 

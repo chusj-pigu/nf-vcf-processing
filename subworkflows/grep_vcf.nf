@@ -1,6 +1,6 @@
 include { grep_fusion } from '../modules/ingress'
 include { grep_vcfGenes } from '../modules/ingress'
-include { grep_vcf } from '../modules/ingress'
+include { grep_vcfIDs } from '../modules/ingress'
 include { gzipd_vcf } from '../modules/ingress'
 
 workflow GREP_VCF {
@@ -19,8 +19,9 @@ workflow GREP_VCF {
         .mix(grep_fusion_ch)
     
     grep_genes_ch = grep_vcfGenes(grep_fusion_final)
+        .join(pattern, by: 0)
 
-    grep_ids_ch = grep_vcf(grep_genes_ch, pattern)
+    grep_ids_ch = grep_vcfIDs(grep_genes_ch)
     
     // Will not execute on vcf where there is no match on either previous step
     final_vcf = grep_ids_ch.filter { tuple ->
