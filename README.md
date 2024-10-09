@@ -21,8 +21,10 @@ Filtering VCF files is done with [bcftools], converting to a table is done with 
 ### Parameters
 
 - `--cnv`: Path to the VCF file containing CNVs
-- `--sv`: Path to the VCF file containing SVs
-- `--gene_list`: Path to a file with list of gene names to filter VCF with, each gene must be separated by a newline [default: None]
+- `--sv`: Path to the VCF file containing SVs. Requires `--fusion`, `--translocation` or both.
+- `--fusion`: Enables creating output for fusion type of event [default: false].
+- `--translocation`: Enables creating output for translocation type of event [default: false].
+- `--gene_list`: Path to a file with list of gene names to filter VCF with, each gene must be separated by a newline [default: None].
 - `--sample_id`: Name with which to prefix output files [default: "variants"].
 - `-profile`: Use drac if running on Narval [default: standard].
 - `--out_dir`: Path to the directory that will store output files [default: variants/]

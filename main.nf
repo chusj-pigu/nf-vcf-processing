@@ -8,6 +8,7 @@ def helpMessage() {
          --sv and/or --cnv              Path to the SV and/or CNV vcf file(s)
 
          Optional arguments:
+         --fusion, --translocation      If --sv is used, at least one of these options has to be used.
          --gene_list                    Path to a file with list of gene names to filter VCF with, each gene must be separated by a newline [default: EMPTY]
          --sample_id                    String of name with which to prefix output files [default: "variants"]
          --out_dir                      Output directory [default: variants]
