@@ -46,7 +46,7 @@ cnv <- cnv %>% arrange(CHROM, POS)
 cnv$CHROM <- paste0("chr", cnv$CHROM)
 
 #Reorder the columns
-cnv <- cnv %>% select(CHROM:SVTYPE,GENE,COPY_NUMBER_STATUS,N_TRANSCRIPTS,`TRANSCRIPT_LOF_(%)`)
+cnv <- cnv %>% select(CHROM,POS,END,SVTYPE,GENE,SVLEN,COPY_NUMBER_STATUS,N_TRANSCRIPTS,`TRANSCRIPT_LOF_(%)`,ID)
 
 #Keep only info on genes of interest if applicable and write table as a tsv:
 if (exists("genes")) {
