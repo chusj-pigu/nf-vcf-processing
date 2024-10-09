@@ -28,19 +28,11 @@ include { GREP_VCF } from './subworkflows/grep_vcf'
 
 workflow {
 
-    // Automatically turn on fusion and translocation is a --sv file is provided
-    def fusion = params.sv != null ? true : false
-    def translocation = params.sv != null ? true : false
-
     // vcf channel
     cnv_ch = params.cnv != null ? Channel.of(tuple('cnv', params.cnv)) : Channel.empty()
-    fusion_ch = fusion ? Channel.of(tuple('fusion', params.sv)) : Channel.empty()
-    transloc_ch = translocation ? Channel.of(tuple('translocation', params.sv)) : Channel.empty()
+    fusion_ch = params.fusion ? Channel.of(tuple('fusion', params.sv)) : Channel.empty()
+    transloc_ch = params.translocation ? Channel.of(tuple('translocation', params.sv)) : Channel.empty()
     all_vcf_ch = cnv_ch.mix(fusion_ch,transloc_ch)
-
-    // Create a channel that will filter types of mutation that are enabled
-   // all_types = all_vcf_ch
-     //   .map{ tuple -> tuple[0] }
 
     // Pattern channel
     pattern_ch = Channel.fromPath(params.patterns)
@@ -69,12 +61,15 @@ workflow {
         .toList()
     
     if (!params.gene_list.endsWith('NO_FILE')) {
-    types_processed
-        .view { types ->
-            println "Selected genes were found for event type: ${types.join(', ')}"
-        }
+        types_processed
+            .view { types ->
+                println "Selected genes were found for event type: ${types.join(', ')}"
+            }
     } else {
-    println "No gene list provided, summary tables include all fusion, translocation and cnv events."
-    }
+        types_processed
+            .view { types ->
+                println "No gene list provided, summary table(s) include all ${types.join(', ')} events"
+            }
+    } 
 
 }
