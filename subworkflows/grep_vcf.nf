@@ -10,15 +10,8 @@ workflow GREP_VCF {
 
     main:
     gzipd_vcf(vcf)
-
-    // Will only execute on fusion vcf
-    grep_fusion_ch = grep_fusion(gzipd_vcf.out)
-
-    // Replace the fusion raw fusion vcf with the vcf containing only gene fusion
-    grep_fusion_final = gzipd_vcf.out.filter { type, vcf -> type != 'fusion' }
-        .mix(grep_fusion_ch)
     
-    grep_genes_ch = grep_vcfGenes(grep_fusion_final)
+    grep_genes_ch = grep_vcfGenes(gzipd_vcf.out)
         .join(pattern, by: 0)
 
     grep_ids_ch = grep_vcfIDs(grep_genes_ch)

@@ -31,9 +31,8 @@ workflow {
 
     // vcf channel
     cnv_ch = params.cnv != null ? Channel.of(tuple('cnv', params.cnv)) : Channel.empty()
-    fusion_ch = params.fusion ? Channel.of(tuple('fusion', params.sv)) : Channel.empty()
-    transloc_ch = params.translocation ? Channel.of(tuple('translocation', params.sv)) : Channel.empty()
-    all_vcf_ch = cnv_ch.mix(fusion_ch,transloc_ch)
+    sv_ch = params.sv != null ? Channel.of(tuple('sv', params.sv)) : Channel.empty()
+    all_vcf_ch = cnv_ch.mix(sv_ch)
 
     // Pattern channel
     pattern_ch = Channel.fromPath(params.patterns)

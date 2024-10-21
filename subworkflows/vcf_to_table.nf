@@ -20,12 +20,10 @@ workflow VCF_TO_TABLE {
     table_ch = gatk_table(bcf_filt_ch)
 
     cnv_ch = table_ch.filter { tuple -> tuple[0] == 'cnv' }
-    fusion_ch = table_ch.filter { tuple -> tuple[0] == 'fusion' }
-    transloc_ch = table_ch.filter { tuple -> tuple[0] == 'translocation' }
+    sv_ch = table_ch.filter { tuple -> tuple[0] == 'sv' }
 
     clean_cnvTable(cnv_ch, gene_file)
-    clean_fusionTable(fusion_ch, gene_file)
-    clean_translocTable(transloc_ch, gene_file)
+    clean_svTable(sv_ch, gene_file)
 
     emit:
     table = table_ch

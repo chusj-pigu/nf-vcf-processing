@@ -1,3 +1,2 @@
 cnv,Spectre\..{3}\.[0-9a-zA-Z]*[^\t]
-fusion,Sniffles2\..{3}\.[0-9a-zA-Z]*[^\t]
-translocation,Sniffles2\.BND\.[0-9a-zA-Z]*[^\t]
+sv,Sniffles2\..{3}\.[0-9a-zA-Z]*[^\t]
