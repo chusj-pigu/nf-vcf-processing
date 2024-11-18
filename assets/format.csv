@@ -1,1 +1,5 @@
-snp,GT,DP,AF,PS
+clinvar,GT,GQ,DP,AD,AF
+spectre,GT,GQ,HO
+sv,GT,GQ,DR,DV
+snp,GT,GQ,DP,AD,AF
+qdnaseq,
