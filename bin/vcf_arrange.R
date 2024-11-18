@@ -24,7 +24,7 @@ cancer_genes <- args[3]
 
 stjude_genes <- readLines(gene_list)
 
-sylvie_genes <- fread(cancer_genes, header = TRUE, stringsAsFactors = FALSE)[["hgnc_symbol"]]
+sylvie_genes <- readLines(cancer_genes)
 
 vcf <- fread(input_file)
 
