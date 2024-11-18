@@ -1,6 +1,6 @@
 # nf-vcf-processing
 
-[Nextflow] workflow for generating summary tables for gene fusions, translocations and copy number variants from VCF files obtained from [wf-human-variation].
+[Nextflow] workflow for generating summary tables for CNV, CV and SNP VCF files obtained from [wf-human-variation]. Uses [gatk] and [R].
 
 ## Dependencies
 
@@ -9,36 +9,30 @@ Requires either [Docker] or [Apptainer] installed.
 ## Usage
 
 ``` sh
-nextflow run chusj-pigu/nf-vcf-processing -r main [--cnv FILE] [--sv FILE] [--gene_list FILE] [--sample_id STR]
+nextflow run chusj-pigu/nf-vcf-processing -r main [--in_dir DIR] 
 ```
 
-Overview:
+## Inputs
 
-This workflow does not require extensive memory or cpu usage, and can be run locally or on the login node of Compute Canada Narval (with `-profile drac`). Requires at least one of `--cnv FILE` or `--sv FILE`.
-
-Filtering VCF files is done with [bcftools], converting to a table is done with [gatk] and arranging the table is done with [R].
-
-### Parameters
-
-- `--cnv`: Path to the VCF file containing CNVs
-- `--sv`: Path to the VCF file containing SVs. Requires `--fusion`, `--translocation` or both.
-- `--fusion`: Enables creating output for fusion type of event [default: false].
-- `--translocation`: Enables creating output for translocation type of event [default: false].
-- `--gene_list`: Path to a file with list of gene names to filter VCF with, each gene must be separated by a newline [default: None].
-- `--sample_id`: Name with which to prefix output files [default: "variants"].
-- `-profile`: Use drac if running on Narval [default: standard].
-- `--out_dir`: Path to the directory that will store output files [default: variants/]
-- `--pattern`: Usually not reqiuired. Path to a csv file containing type of event (cnv, fusion or translocation) as first column and pattern with which to filter ID field of VCF with as second column. Default is stored in asstets of this project.
-- `--fields`: Usually not reqiuired. Path to a csv file containing type of event (cnv, fusion or translocation) as first column and fields to keep in VCF as subsequent elements. Default is stored in asstets of this project.
+This workflow takes as the only input the directory within which vcf files to be processed are found.
 
 ## Outputs
 
-Fusions and translocations summary tsv tables will be generated if `--sv` is used, and copy number variants summary tsv if `--cnv` is used.
+This workflow outputs one `*_summary.tsv` per vcf file, and outputs two tsv files for Spectre VCF (one that is more detailed and one more summarized with the suffix `_short.tsv`).
+
+### Parameters
+
+- `--in_dir`: Path to the directory containing VCF files to be processed.
+- `--stjude_list`: Path to a file containing a list of gene to filter SNP and SV VCF with, each gene must be separated by a newline [default: St-Jude panel].
+- `--cancer_genes`: Path to a file containing a list of genes to filter CNV files with when they are more than 100 rows long [default: Sylvie's long gene list]
+- `-profile`: Use drac if running on Narval [default: standard].
+- `--out_dir`: Path to the directory that will store output files [default: same as `--in_dir`]
+- `--info`: Usually not required. Path to a csv file containing type of vcf as first column and vcf INFO fields to keep. Default is stored in assets of this project.
+- `--format`: Usually not required. Path to a csv file containing type of vcf as first column and vcf FORMAT fields to keep. Default is stored in assets of this project.
 
 [Docker]: https://www.docker.com
 [Apptainer]: https://apptainer.org
 [Nextflow]: https://www.nextflow.io/docs/latest/index.html
-[bcftools]: https://samtools.github.io/bcftools/bcftools.html
 [gatk]: https://gatk.broadinstitute.org/hc/en-us
 [R]: https://www.r-project.org
 [wf-human-variation]: https://github.com/epi2me-labs/wf-human-variation
