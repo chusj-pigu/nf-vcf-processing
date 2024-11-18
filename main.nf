@@ -23,54 +23,76 @@ if (params.help) {
     exit 0
 }
 
-include { VCF_TO_TABLE } from './subworkflows/vcf_to_table.nf'
-include { GREP_VCF } from './subworkflows/grep_vcf'
+include { PROCESS_VCF } from './subworkflows/process_vcf'
 
 
 workflow {
 
     // vcf channel
-    cnv_ch = params.cnv != null ? Channel.of(tuple('cnv', params.cnv)) : Channel.empty()
-    fusion_ch = params.fusion ? Channel.of(tuple('fusion', params.sv)) : Channel.empty()
-    transloc_ch = params.translocation ? Channel.of(tuple('translocation', params.sv)) : Channel.empty()
-    all_vcf_ch = cnv_ch.mix(fusion_ch,transloc_ch)
+    cnv_ch = params.cnv != null ? Channel.fromPath(params.cnv).map { file -> tuple('cnv', file) } : Channel.empty()
+    sv_ch = params.sv != null ? Channel.fromPath(params.sv).map { file -> tuple('sv', file) } : Channel.empty()
+    snp_ch = params.snp != null ? Channel.fromPath(params.snp).map { file -> tuple('snp', file) } : Channel.empty()
+    all_vcf_ch = cnv_ch.mix(sv_ch, snp_ch)
 
-    // Pattern channel
-    pattern_ch = Channel.fromPath(params.patterns)
-        .splitCsv()
-        .map { row -> tuple(row[0],row[1]) }
-
-    // Field channels
-    gatk_fields_ch = Channel.fromPath(params.fields)
+    // Prepare channels for fields to keep in vcf (bcftool step)
+    info_ch = Channel.fromPath(params.info)   // Fields to keep in the INFO category of VCF
         .splitCsv()
         .map { row -> 
             def type = row[0]
-            def fields = row[1..-1].findAll { it }.collect { "-F ${it}" }
+            def fields = row[1..-1].findAll { it }.collect { "%INFO/${it}" }
             tuple(type, fields.join(' '))
         }
-    
-    genes_ch = Channel.fromPath(params.gene_list)
 
-    GREP_VCF(all_vcf_ch, pattern_ch) 
-    VCF_TO_TABLE(GREP_VCF.out.raw_vcf,GREP_VCF.out.final_vcf,gatk_fields_ch,genes_ch)
+    format_ch = Channel.fromPath(params.format)  // Fields to keep in FORMAT category of VCF, they have to be called differently in the function
+        .splitCsv()
+        .map { row -> 
+            def type = row[0]
+            def fields = row[1..-1].findAll { it }
+            def formatted_fields = fields ? "[${fields.collect { "%${it}" }.join(':')}]" : ""
+            tuple(type, formatted_fields)
+        }
+        
+    fields_ch = info_ch
+        .join(format_ch, by:0, remainder:true)
+        .map { type, info, format ->
+            def columns = format ? "${info} ${format}".trim() : "${info}"
+            tuple(type, columns)
+        }
+
+    // Prepare channel for columns to keep in table (gatk step)
+    gatk_info = info_ch
+        .map { type, fields ->
+            def new_fields = fields.replaceAll("%INFO/", "-F ")
+            tuple(type, new_fields)
+        }
+    
+    gatk_format = format_ch 
+        .map { type, cols ->
+            def gt_cols = cols.replaceAll("%", "-GF ")
+            def new_cols = gt_cols.replaceAll("[\\[\\]]", "")
+            def spaced_cols = new_cols.replaceAll(":", " ")
+            tuple(type, spaced_cols)
+        }
+    
+    columns_ch = gatk_info
+        .join(gatk_format, by:0, remainder:true)
+        .map { type, info, format ->
+            def columns = format ? "${info} ${format}".trim() : "${info}"
+            tuple(type, columns)
+        }
+
+    PROCESS_VCF(all_vcf_ch, fields_ch, columns_ch) 
 
     // Prints message to indicates which tables were processed :
 
-    types_processed = VCF_TO_TABLE.out.table
-        .map { tuple -> tuple[0] }   // Extract type field (assuming type is the first element in the tuple)
+    types_processed = PROCESS_VCF.out.table
+        .map { tuple -> tuple[0] }  
         .unique()
         .toList()
     
-    if (!params.gene_list.endsWith('NO_FILE')) {
-        types_processed
-            .view { types ->
-                println "Selected genes were found for event type: ${types.join(', ')}"
-            }
-    } else {
-        types_processed
-            .view { types ->
-                println "No gene list provided, summary table(s) include all ${types.join(', ')} events"
-            }
-    } 
+    types_processed
+        .view { types ->
+            println "Selected genes were found for event type: ${types.join(', ')}"
+        }
 
 }
