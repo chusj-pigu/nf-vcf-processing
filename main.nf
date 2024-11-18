@@ -34,6 +34,10 @@ workflow {
     snp_ch = params.snp != null ? Channel.fromPath(params.snp).map { file -> tuple('snp', file) } : Channel.empty()
     all_vcf_ch = cnv_ch.mix(sv_ch, snp_ch)
 
+    // gene list channel
+
+    gene_ch = Channel.fromPath(params.gene_list)
+
     // Prepare channels for fields to keep in vcf (bcftool step)
     info_ch = Channel.fromPath(params.info)   // Fields to keep in the INFO category of VCF
         .splitCsv()
@@ -81,7 +85,7 @@ workflow {
             tuple(type, columns)
         }
 
-    PROCESS_VCF(all_vcf_ch, fields_ch, columns_ch) 
+    PROCESS_VCF(all_vcf_ch, fields_ch, columns_ch, gene_ch) 
 
     // Prints message to indicates which tables were processed :
 

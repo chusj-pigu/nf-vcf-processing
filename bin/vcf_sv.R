@@ -14,7 +14,6 @@ output_file <- args[2]
 #Remove the | characters from the gene_list
 #gene_list <- readLines("gene_list")
 #gene_list <- gsub("\\|", "", gene_list)
-input_file <- "/lustre07/scratch/clawrukd/wf-tests/work/db/3fc18381a53b07849d4b2d60077b4c/variants_sv.genes.table"
 
 # Read the sv table into a dataframe; no headers are provided
 sv <- read.delim(input_file, header = F)
@@ -49,7 +48,7 @@ sv_red <- sv_ann %>%
 sv_red <- sv_red %>%
   separate(LOF, into = c("LOF_gene_name", "LOF_Gene_ID", "LOF_Number_of_transcripts_in_gene", "LOF_Percent_of_transcripts_affected"), sep = "\\|") %>%
   # Select relevant columns
-  select(CHROM, POS, END, ann4, SVTYPE, SVLEN, `%VAF`, MEAN_COVERAGE, ann2, ann1, REF, ann3, LOF_Number_of_transcripts_in_gene, LOF_Percent_of_transcripts_affected, ID) %>%
+  select(CHROM, POS, END, ann4, SVTYPE, SVLEN, `%VAF`, MEAN_COVERAGE, ann2, ann1, REF, ann3, ID, LOF_Number_of_transcripts_in_gene, LOF_Percent_of_transcripts_affected) %>%
   rename(GENES = ann4, SEQ_ONTOLOGY = ann2, EFFECT = ann3, ALT = ann1)  # Rename columns to be more descriptive
 
 # Convert the percentage of affected transcripts to a numeric type (removing any trailing ')')
@@ -72,28 +71,51 @@ calculate_mean <- function(numbers) {
 
 sv_red$MEAN_COVERAGE <- sapply(sv_red$MEAN_COVERAGE, calculate_mean)
 
+# Make the list of genes for each event in the same row :
+sv_genes <- sv_red %>%
+  arrange(GENES) %>%
+  group_by(ID) %>%
+  summarize(
+    GENES = paste(GENES, collapse = ", "),
+    .groups = 'drop')
+
+# Remove duplicated in Genes
+remove_duplicates <- function(gene_col) {
+  split_vector <- unlist(strsplit(gene_col, ", "))  # Split the string
+  unique_values <- unique(split_vector)  # Get unique values
+  result <- paste(unique_values, collapse = ", ")  # Combine back into a single string
+  return(result)
+}
+
+genes_unique <- sapply(sv_genes$GENES,remove_duplicates)
+
+sv_genes <- sv_genes %>%
+  mutate(GENES = genes_unique)
+
+sv_final <- sv_red %>%
+  select(-GENES) %>%
+  distinct() %>%
+  left_join(sv_genes) %>%
+  select(CHROM:END,GENES,SVTYPE:ID)   #Drop the LOF columns
+
 # Replace "X" and "Y" chromosomes with numeric values for sorting (X=23, Y=24)
 x <- 23
 y <- 24
 
 # Convert 'CHROM' to numeric for sorting, replacing 'X' with 23 and 'Y' with 24
-sv_red$CHROM <- sv_red$CHROM %>%
+sv_final$CHROM <- sv_final$CHROM %>%
   gsub("X", x, .) %>%
   gsub("Y", y, .) %>%
   gsub("chr", "", .) %>%
   as.numeric()
 
 # Reorder the data by chromosome and position
-sv_red <- sv_red %>% arrange(CHROM, POS)
+sv_final <- sv_final %>% arrange(CHROM, POS)
 
 # Convert 'CHROM' back to character format with "chr" prefix, restoring X and Y chromosomes
-sv_red$CHROM <- sv_red$CHROM %>%
+sv_final$CHROM <- sv_final$CHROM %>%
   paste0("chr", .) %>%
   gsub(x, "X", .) %>%
   gsub(y, "Y", .)
-
-sv_final <- sv_red %>% 
-  select(-`%LOF_transcripts_affected`, -LOF_Number_of_transcripts_in_gene, -LOF_Percent_of_transcripts_affected) %>%
-  distinct()
 
 write_tsv(sv_final, output_file)
