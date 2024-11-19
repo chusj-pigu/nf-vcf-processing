@@ -8,6 +8,8 @@ workflow PROCESS_VCF {
     gzip
     raw
     fields
+    stjude
+    cancer
 
     main:
     gzipd_vcf(gzip)
@@ -27,8 +29,11 @@ workflow PROCESS_VCF {
 
     vcf_to_table(qdnaseq_ch)
 
-    final_ch = gatk_table.out
+    tables_ch = gatk_table.out
         .mix(vcf_to_table.out)
+        .combine(stjude)
+        .combine(cancer)
 
-    clean_vcf(final_ch)
+
+    clean_vcf(tables_ch)
 }

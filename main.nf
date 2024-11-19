@@ -28,6 +28,10 @@ include { PROCESS_VCF } from './subworkflows/process_vcf'
 
 workflow {
 
+    // Create a channel for gene lists:
+    stjude_ch = Channel.fromPath(params.stjude_list)
+    cancer_ch = Channel.fromPath(params.cancer_genes)
+
     // Create a channel from all files in the specified directory
     all_vcf_ch = Channel.fromPath("${params.in_dir}/*")
 
@@ -94,6 +98,6 @@ workflow {
             tuple(type, columns)
         }
 
-    PROCESS_VCF(tuples_vcf.gzip,tuples_vcf.raw,fields_ch)
+    PROCESS_VCF(tuples_vcf.gzip,tuples_vcf.raw,fields_ch,stjude_ch,cancer_ch)
 
 }
