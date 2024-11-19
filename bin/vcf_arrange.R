@@ -100,15 +100,21 @@ snp_arrange <- function(vcf, genes) {
   # Split the 'ANN' column into multiple columns
   ann_cols <- paste0("ann", 1:max_ann)
   vcf[, (ann_cols) := tstrsplit(ANN, ",", fixed = TRUE)]
+
+  gc()
   
   # Melt the data.table to create long format and remove NA annotations
   table_ann <- melt(vcf, measure.vars = ann_cols, value.name = "ann", na.rm = TRUE)
+
+  gc()
   
   # Split the 'ann' column into multiple annotation fields
   table_ann[, c("Allele", "Annotation", "Annotation_Impact", "Gene_Name", "Gene_ID", "Feature_Type", 
                 "Feature_ID", "Transcript_BioType", "Rank", "HGVS.c", "HGVS.p", 
                 "cDNA.pos/cDNA.length", "CDS.pos/CDS.length", "AA.pos/AA.length", 
                 "Distance", "ERRORS/WARNINGS/INFO") := tstrsplit(ann, "\\|", fixed = FALSE)]
+
+  gc()
   
   # Filter and clean the data
   table_red <- table_ann[
