@@ -94,39 +94,106 @@ snp_arrange <- function(vcf, genes) {
   setnames(vcf, old = grep(".*\\.AD$", colnames(vcf), value = TRUE), new = "ALLELE_DEPTH")
   setnames(vcf, old = grep(".*\\.AF$", colnames(vcf), value = TRUE), new = "VAF")
   
-  # Find the maximum number of comma-separated annotations (ANN field)
-  max_ann <- max(str_count(vcf$ANN, ","), na.rm = TRUE) + 1
-  
-  # Split the 'ANN' column into multiple columns
-  ann_cols <- paste0("ann", 1:max_ann)
-  vcf[, (ann_cols) := tstrsplit(ANN, ",", fixed = TRUE)]
+  chunk_size <- 1e6  # Proceed in chunks to reduce memory usage
+  total_rows <- nrow(vcf)
+  result_list <- list()
 
-  gc()
+  for (start_row in seq(1, total_rows, by = chunk_size)) {
+    end_row <- min(start_row + chunk_size - 1, total_rows)
+    chunk <- vcf[start_row:end_row]
   
-  # Melt the data.table to create long format and remove NA annotations
-  table_ann <- melt(vcf, measure.vars = ann_cols, value.name = "ann", na.rm = TRUE)
+    # Apply your operations to the chunk
+    max_ann <- max(str_count(chunk$ANN, ","), na.rm = TRUE) + 1
+    ann_cols <- paste0("ann", 1:max_ann)
+    chunk[, (ann_cols) := tstrsplit(ANN, ",", fixed = TRUE)]
+  
+    table_ann <- melt(chunk, measure.vars = ann_cols, value.name = "ann", na.rm = TRUE)
+    table_ann[, c("Allele", "Annotation", "Annotation_Impact", "Gene_Name", "Gene_ID", 
+                "Feature_Type", "Feature_ID", "Transcript_BioType", "Rank", 
+                "HGVS.c", "HGVS.p", "cDNA.pos/cDNA.length", "CDS.pos/CDS.length", 
+                "AA.pos/AA.length", "Distance", "ERRORS/WARNINGS/INFO") := 
+              tstrsplit(ann, "\\|", fixed = FALSE)]
+  
+    # Perform filtering and cleaning
+    table_red <- table_ann[
+      !Annotation %in% c("intron_variant", "downstream_gene_variant", "upstream_gene_variant", "synonymous_variant") &
+        Gene_Name %in% gene_list & 
+        !str_detect(Feature_ID, "XM") & 
+        (Annotation_Impact %in% c("MODERATE", "HIGH")) & 
+        FILTER == "PASS",
+      .(ID, CHROM, POS, REF, Allele, GENOTYPE, GENOTYPE_QUALITY, READ_DEPTH, 
+        ALLELE_DEPTH, VAF, QUAL, FILTER, Annotation, Annotation_Impact, Gene_Name, 
+        Feature_Type, Feature_ID, Transcript_BioType, Rank, HGVS.c, HGVS.p, 
+        `cDNA.pos/cDNA.length`, `CDS.pos/CDS.length`, `AA.pos/AA.length`, Distance, 
+        `ERRORS/WARNINGS/INFO`)
+    ]
+  
+    result_list[[length(result_list) + 1]] <- table_red
+  }
+  
+  
+  # Replace "X" and "Y" chromosomes with numeric values for sorting
+  x <- 23
+  y <- 24
+  
+  # Convert 'CHROM' to numeric for sorting, replacing 'X' with 23 and 'Y' with 24
+  table_red[, CHROM := as.numeric(gsub("chr", "", gsub("X", x, gsub("Y", y, CHROM))))]
+  
+  # Reorder the data by chromosome and position
+  setorder(table_red, CHROM, POS)
+  
+  # Convert 'CHROM' back to character format with "chr" prefix, restoring X and Y chromosomes
+  table_red[, CHROM := gsub(x, "X", gsub(y, "Y", paste0("chr", CHROM)))]
+  
+  return(table_red)
+}
 
-  gc()
-  
-  # Split the 'ann' column into multiple annotation fields
-  table_ann[, c("Allele", "Annotation", "Annotation_Impact", "Gene_Name", "Gene_ID", "Feature_Type", 
-                "Feature_ID", "Transcript_BioType", "Rank", "HGVS.c", "HGVS.p", 
-                "cDNA.pos/cDNA.length", "CDS.pos/CDS.length", "AA.pos/AA.length", 
-                "Distance", "ERRORS/WARNINGS/INFO") := tstrsplit(ann, "\\|", fixed = FALSE)]
+clinvar_arrange <- function(vcf, genes) {
 
-  gc()
+  # Rename columns using data.table's setnames function
+  setnames(vcf, old = grep(".*\\.GT$", colnames(vcf), value = TRUE), new = "GENOTYPE")
+  setnames(vcf, old = grep(".*\\.GQ$", colnames(vcf), value = TRUE), new = "GENOTYPE_QUALITY")
+  setnames(vcf, old = grep(".*\\.DP$", colnames(vcf), value = TRUE), new = "READ_DEPTH")
+  setnames(vcf, old = grep(".*\\.AD$", colnames(vcf), value = TRUE), new = "ALLELE_DEPTH")
+  setnames(vcf, old = grep(".*\\.AF$", colnames(vcf), value = TRUE), new = "VAF")
   
-  # Filter and clean the data
-  table_red <- table_ann[
-    !Annotation %in% c("intron_variant", "downstream_gene_variant", "upstream_gene_variant", "synonymous_variant") &
-      Gene_Name %in% genes & 
-      !str_detect(Feature_ID, "XM") & 
-      (Annotation_Impact %in% c("MODERATE", "HIGH")),
-    .(ID, CHROM, POS, REF, Allele, GENOTYPE, GENOTYPE_QUALITY, READ_DEPTH, ALLELE_DEPTH, VAF, QUAL, FILTER, 
-      Annotation, Annotation_Impact, Gene_Name, Feature_Type, Feature_ID, Transcript_BioType, 
-      Rank, HGVS.c, HGVS.p, `cDNA.pos/cDNA.length`, `CDS.pos/CDS.length`, `AA.pos/AA.length`, 
-      Distance, `ERRORS/WARNINGS/INFO`)
-  ]
+  chunk_size <- 20000  # Proceed in chunks to reduce memory usage
+  total_rows <- nrow(vcf)
+  result_list <- list()
+
+  for (start_row in seq(1, total_rows, by = chunk_size)) {
+    end_row <- min(start_row + chunk_size - 1, total_rows)
+    chunk <- vcf[start_row:end_row]
+  
+    # Apply your operations to the chunk
+    max_ann <- max(str_count(chunk$ANN, ","), na.rm = TRUE) + 1
+    ann_cols <- paste0("ann", 1:max_ann)
+    chunk[, (ann_cols) := tstrsplit(ANN, ",", fixed = TRUE)]
+  
+    table_ann <- melt(chunk, measure.vars = ann_cols, value.name = "ann", na.rm = TRUE)
+    table_ann[, c("Allele", "Annotation", "Annotation_Impact", "Gene_Name", "Gene_ID", 
+                "Feature_Type", "Feature_ID", "Transcript_BioType", "Rank", 
+                "HGVS.c", "HGVS.p", "cDNA.pos/cDNA.length", "CDS.pos/CDS.length", 
+                "AA.pos/AA.length", "Distance", "ERRORS/WARNINGS/INFO") := 
+              tstrsplit(ann, "\\|", fixed = FALSE)]
+  
+    # Perform filtering and cleaning
+    table_red <- table_ann[
+      !Annotation %in% c("intron_variant", "downstream_gene_variant", "upstream_gene_variant", "synonymous_variant") &
+        Gene_Name %in% gene_list & 
+        !str_detect(Feature_ID, "XM") & 
+        (Annotation_Impact %in% c("MODERATE", "HIGH")) & 
+        FILTER == "PASS",
+      .(ID, CHROM, POS, REF, Allele, GENOTYPE, GENOTYPE_QUALITY, READ_DEPTH, 
+        ALLELE_DEPTH, VAF, QUAL, FILTER, Annotation, Annotation_Impact, Gene_Name, 
+        Feature_Type, Feature_ID, Transcript_BioType, Rank, HGVS.c, HGVS.p, 
+        `cDNA.pos/cDNA.length`, `CDS.pos/CDS.length`, `AA.pos/AA.length`, Distance, 
+        `ERRORS/WARNINGS/INFO`, ALLELEID, SCIDNINCL, CLNREVSTAT, ONCREVSTAT, CLNDNINCL,
+        ONCDNINCL, SCIREVSTAT, CLNDN, ONCDN, SCIDN)
+    ]
+  
+    result_list[[length(result_list) + 1]] <- table_red
+  }
   
   
   # Replace "X" and "Y" chromosomes with numeric values for sorting
@@ -272,7 +339,7 @@ output_name <- gsub(".table", "_summary", input_file)
 # Check if the data.table has any rows
 if (nrow(vcf) > 0) {
   if (str_detect(input_file, "clinvar")) {
-    vcf_clinvar <- snp_arrange(vcf, stjude_genes)  
+    vcf_clinvar <- clinvar_arrange(vcf, stjude_genes)  
     fwrite(vcf_clinvar, paste0(output_name, ".tsv"), sep = "\t")
   } else if (str_detect(input_file, "sv")) {
     vcf_sv <- sv_arrange(vcf, stjude_genes)  
