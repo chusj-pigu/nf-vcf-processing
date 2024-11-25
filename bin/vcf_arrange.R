@@ -60,11 +60,11 @@ ann_fields <- c("Allele", "Annotation", "Annotation_Impact", "Gene_Name", "Gene_
 table_ann[, (ann_fields) := tstrsplit(ann, "\\|", fixed = FALSE)]
 
 # Filter out unwanted annotations and genes, then select columns
-table_red <- table_ann[
+result <- table_ann[
   !Annotation %in% c("intron_variant", "downstream_gene_variant", "upstream_gene_variant", "synonymous_variant") &
     Gene_Name %in% genes
 ]
-table_red <- table_red[, .(
+result <- result[, .(
   ID, CHROM, POS, SVTYPE, SVLEN, END, Gene_Name, REF, ALT,
   N_READS_REF, N_READS_ALT, VAF, GENOTYPE, CHR2, Annotation,
   QUAL, FILTER, Annotation_Impact, `ERRORS/WARNINGS/INFO`
@@ -73,15 +73,15 @@ table_red <- table_red[, .(
 # Replace "X" and "Y" chromosomes with numeric values for sorting
 x <- 23
 y <- 24
-table_red[, CHROM := as.numeric(gsub("chr", "", gsub("Y", y, gsub("X", x, CHROM))))]
+result[, CHROM := as.numeric(gsub("chr", "", gsub("Y", y, gsub("X", x, CHROM))))]
 
 # Reorder by chromosome and position
-setorder(table_red, CHROM, POS)
+setorder(result, CHROM, POS)
 
 # Convert 'CHROM' back to character format with "chr" prefix, restoring X and Y
-table_red[, CHROM := gsub(y, "Y", gsub(x, "X", paste0("chr", CHROM)))]
+result[, CHROM := gsub(y, "Y", gsub(x, "X", paste0("chr", CHROM)))]
 
-return(table_red)
+return(result)
 }
 
 
@@ -94,30 +94,36 @@ snp_arrange <- function(vcf, genes) {
   setnames(vcf, old = grep(".*\\.AD$", colnames(vcf), value = TRUE), new = "ALLELE_DEPTH")
   setnames(vcf, old = grep(".*\\.AF$", colnames(vcf), value = TRUE), new = "VAF")
   
-  chunk_size <- 1e6  # Proceed in chunks to reduce memory usage
-  total_rows <- nrow(vcf)
-  result_list <- list()
+  chunk_size <- 1e6  # Number of rows per chunk
+total_rows <- nrow(vcf)
+
+result <- data.table()
 
   for (start_row in seq(1, total_rows, by = chunk_size)) {
     end_row <- min(start_row + chunk_size - 1, total_rows)
+  
+    # Process chunk in place
     chunk <- vcf[start_row:end_row]
   
-    # Apply your operations to the chunk
+  # Calculate maximum annotations and split
     max_ann <- max(str_count(chunk$ANN, ","), na.rm = TRUE) + 1
     ann_cols <- paste0("ann", 1:max_ann)
     chunk[, (ann_cols) := tstrsplit(ANN, ",", fixed = TRUE)]
   
-    table_ann <- melt(chunk, measure.vars = ann_cols, value.name = "ann", na.rm = TRUE)
-    table_ann[, c("Allele", "Annotation", "Annotation_Impact", "Gene_Name", "Gene_ID", 
-                "Feature_Type", "Feature_ID", "Transcript_BioType", "Rank", 
-                "HGVS.c", "HGVS.p", "cDNA.pos/cDNA.length", "CDS.pos/CDS.length", 
-                "AA.pos/AA.length", "Distance", "ERRORS/WARNINGS/INFO") := 
-              tstrsplit(ann, "\\|", fixed = FALSE)]
+    # Melt directly into the table
+    chunk <- melt(chunk, measure.vars = ann_cols, value.name = "ann", na.rm = TRUE)
   
-    # Perform filtering and cleaning
-    table_red <- table_ann[
+    # Split the 'ann' column
+    chunk[, c("Allele", "Annotation", "Annotation_Impact", "Gene_Name", "Gene_ID", 
+              "Feature_Type", "Feature_ID", "Transcript_BioType", "Rank", 
+              "HGVS.c", "HGVS.p", "cDNA.pos/cDNA.length", "CDS.pos/CDS.length", 
+              "AA.pos/AA.length", "Distance", "ERRORS/WARNINGS/INFO") := 
+            tstrsplit(ann, "\\|", fixed = FALSE)]
+  
+    # Apply filtering and directly bind to the result
+    chunk <- chunk[
       !Annotation %in% c("intron_variant", "downstream_gene_variant", "upstream_gene_variant", "synonymous_variant") &
-        Gene_Name %in% gene_list & 
+        Gene_Name %in% genes & 
         !str_detect(Feature_ID, "XM") & 
         (Annotation_Impact %in% c("MODERATE", "HIGH")) & 
         FILTER == "PASS",
@@ -128,7 +134,10 @@ snp_arrange <- function(vcf, genes) {
         `ERRORS/WARNINGS/INFO`)
     ]
   
-    result_list[[length(result_list) + 1]] <- table_red
+    # Append filtered rows to the result data.table
+    result <- rbind(result, chunk, use.names = TRUE)
+  
+    gc()  # Trigger garbage collection
   }
   
   
@@ -137,15 +146,15 @@ snp_arrange <- function(vcf, genes) {
   y <- 24
   
   # Convert 'CHROM' to numeric for sorting, replacing 'X' with 23 and 'Y' with 24
-  table_red[, CHROM := as.numeric(gsub("chr", "", gsub("X", x, gsub("Y", y, CHROM))))]
+  result[, CHROM := as.numeric(gsub("chr", "", gsub("X", x, gsub("Y", y, CHROM))))]
   
   # Reorder the data by chromosome and position
-  setorder(table_red, CHROM, POS)
+  setorder(result, CHROM, POS)
   
   # Convert 'CHROM' back to character format with "chr" prefix, restoring X and Y chromosomes
-  table_red[, CHROM := gsub(x, "X", gsub(y, "Y", paste0("chr", CHROM)))]
+  result[, CHROM := gsub(x, "X", gsub(y, "Y", paste0("chr", CHROM)))]
   
-  return(table_red)
+  return(result)
 }
 
 clinvar_arrange <- function(vcf, genes) {
@@ -163,24 +172,29 @@ clinvar_arrange <- function(vcf, genes) {
 
   for (start_row in seq(1, total_rows, by = chunk_size)) {
     end_row <- min(start_row + chunk_size - 1, total_rows)
+  
+    # Process chunk in place
     chunk <- vcf[start_row:end_row]
   
-    # Apply your operations to the chunk
+  # Calculate maximum annotations and split
     max_ann <- max(str_count(chunk$ANN, ","), na.rm = TRUE) + 1
     ann_cols <- paste0("ann", 1:max_ann)
     chunk[, (ann_cols) := tstrsplit(ANN, ",", fixed = TRUE)]
   
-    table_ann <- melt(chunk, measure.vars = ann_cols, value.name = "ann", na.rm = TRUE)
-    table_ann[, c("Allele", "Annotation", "Annotation_Impact", "Gene_Name", "Gene_ID", 
-                "Feature_Type", "Feature_ID", "Transcript_BioType", "Rank", 
-                "HGVS.c", "HGVS.p", "cDNA.pos/cDNA.length", "CDS.pos/CDS.length", 
-                "AA.pos/AA.length", "Distance", "ERRORS/WARNINGS/INFO") := 
-              tstrsplit(ann, "\\|", fixed = FALSE)]
+    # Melt directly into the table
+    chunk <- melt(chunk, measure.vars = ann_cols, value.name = "ann", na.rm = TRUE)
   
-    # Perform filtering and cleaning
-    table_red <- table_ann[
+    # Split the 'ann' column
+    chunk[, c("Allele", "Annotation", "Annotation_Impact", "Gene_Name", "Gene_ID", 
+              "Feature_Type", "Feature_ID", "Transcript_BioType", "Rank", 
+              "HGVS.c", "HGVS.p", "cDNA.pos/cDNA.length", "CDS.pos/CDS.length", 
+              "AA.pos/AA.length", "Distance", "ERRORS/WARNINGS/INFO") := 
+            tstrsplit(ann, "\\|", fixed = FALSE)]
+  
+    # Apply filtering and directly bind to the result
+    chunk <- chunk[
       !Annotation %in% c("intron_variant", "downstream_gene_variant", "upstream_gene_variant", "synonymous_variant") &
-        Gene_Name %in% gene_list & 
+        Gene_Name %in% genes & 
         !str_detect(Feature_ID, "XM") & 
         (Annotation_Impact %in% c("MODERATE", "HIGH")) & 
         FILTER == "PASS",
@@ -192,7 +206,10 @@ clinvar_arrange <- function(vcf, genes) {
         ONCDNINCL, SCIREVSTAT, CLNDN, ONCDN, SCIDN)
     ]
   
-    result_list[[length(result_list) + 1]] <- table_red
+    # Append filtered rows to the result data.table
+    result <- rbind(result, chunk, use.names = TRUE)
+  
+    gc()  # Trigger garbage collection
   }
   
   
@@ -201,15 +218,15 @@ clinvar_arrange <- function(vcf, genes) {
   y <- 24
   
   # Convert 'CHROM' to numeric for sorting, replacing 'X' with 23 and 'Y' with 24
-  table_red[, CHROM := as.numeric(gsub("chr", "", gsub("X", x, gsub("Y", y, CHROM))))]
+  result[, CHROM := as.numeric(gsub("chr", "", gsub("X", x, gsub("Y", y, CHROM))))]
   
   # Reorder the data by chromosome and position
-  setorder(table_red, CHROM, POS)
+  setorder(result, CHROM, POS)
   
   # Convert 'CHROM' back to character format with "chr" prefix, restoring X and Y chromosomes
-  table_red[, CHROM := gsub(x, "X", gsub(y, "Y", paste0("chr", CHROM)))]
+  result[, CHROM := gsub(x, "X", gsub(y, "Y", paste0("chr", CHROM)))]
   
-  return(table_red)
+  return(result)
 }
 
 remove_duplicates <- function(gene_col) {
@@ -219,7 +236,7 @@ remove_duplicates <- function(gene_col) {
   return(result)
 }
 
-spectre_arrange <- function(vcf, gene_list) {
+spectre_arrange <- function(vcf, genes) {
   
   # Rename columns
   setnames(vcf, old = colnames(vcf), new = gsub("^[^.]*\\.", "", colnames(vcf)))
@@ -249,18 +266,18 @@ spectre_arrange <- function(vcf, gene_list) {
   
   # Filter based on number of rows and gene list
   if (nrow(table_ann) > 100) {
-    gene_pattern <- paste(gene_list, collapse = "|")
-    table_red <- table_ann[str_detect(Gene_Name, gene_pattern)]
+    gene_pattern <- paste(genes, collapse = "|")
+    result <- table_ann[str_detect(Gene_Name, gene_pattern)]
   } else {
-    table_red <- table_ann
+    result <- table_ann
   }
   
   # Create list of genes in the same row, removing duplicates
-  cnv_genes <- table_red[, .(GENES = paste(unique(Gene_Name), collapse = ", ")), by = ID]
+  cnv_genes <- result[, .(GENES = paste(unique(Gene_Name), collapse = ", ")), by = ID]
   cnv_genes[, GENES := sapply(GENES, remove_duplicates)]
   
   # Merge gene information and select columns
-  cnv_final <- merge(table_red[, !"Gene_Name"], cnv_genes, by = "ID", all.x = TRUE)
+  cnv_final <- merge(result[, !"Gene_Name"], cnv_genes, by = "ID", all.x = TRUE)
   cnv_final <- unique(cnv_final[, .(ID, CHROM, POS, END, SVLEN, SVTYPE, CN, CHROM, FILTER, GENES, 
                                   Annotation, Annotation_Impact, `ERRORS/WARNINGS/INFO`)])
   
