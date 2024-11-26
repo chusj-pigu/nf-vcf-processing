@@ -95,9 +95,9 @@ snp_arrange <- function(vcf, genes) {
   setnames(vcf, old = grep(".*\\.AF$", colnames(vcf), value = TRUE), new = "VAF")
   
   chunk_size <- 1e6  # Number of rows per chunk
-total_rows <- nrow(vcf)
+  total_rows <- nrow(vcf)
 
-result <- data.table()
+  result <- data.table()
 
   for (start_row in seq(1, total_rows, by = chunk_size)) {
     end_row <- min(start_row + chunk_size - 1, total_rows)
@@ -168,7 +168,7 @@ clinvar_arrange <- function(vcf, genes) {
   
   chunk_size <- 20000  # Proceed in chunks to reduce memory usage
   total_rows <- nrow(vcf)
-  result_list <- list()
+  result <- data.table()
 
   for (start_row in seq(1, total_rows, by = chunk_size)) {
     end_row <- min(start_row + chunk_size - 1, total_rows)
@@ -330,7 +330,7 @@ qdnaseq_arrange <- function(vcf) {
   # Rename 'sample_id' to 'GENOTYPE' and remove unnecessary columns
   sample_id <- sub("\\.wf.*", "", input_file)
   setnames(vcf, old = sample_id, new = "GENOTYPE")
-  vcf <- vcf[, !c("ID", "FORMAT"), with = FALSE]
+  vcf <- vcf[, !c("ID", "FORMAT", "INFO"), with = FALSE]
   
   # Replace "X" and "Y" chromosomes with numeric values for sorting (X=23, Y=24)
   x <- 23
