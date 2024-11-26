@@ -62,7 +62,7 @@ table_ann[, (ann_fields) := tstrsplit(ann, "\\|", fixed = FALSE)]
 # Filter out unwanted annotations and genes, then select columns
 result <- table_ann[
   !Annotation %in% c("intron_variant", "downstream_gene_variant", "upstream_gene_variant", "synonymous_variant") &
-    Gene_Name %in% genes
+    grepl(paste0("(^|&)", paste(genes, collapse = "|"), "($|&)"), Gene_Name)
 ]
 result <- result[, .(
   ID, CHROM, POS, SVTYPE, SVLEN, END, Gene_Name, REF, ALT,
