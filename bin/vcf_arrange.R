@@ -328,8 +328,14 @@ qdnaseq_arrange <- function(vcf) {
   }
   
   # Rename 'sample_id' to 'GENOTYPE' and remove unnecessary columns
-  sample_id <- sub("\\.wf.*", "", input_file)
-  setnames(vcf, old = sample_id, new = "GENOTYPE")
+
+  if (any(str_detect(colnames(vcf), "reads"))) {
+    setnames(vcf, old = "reads", new = "GENOTYPE")
+  } else {
+    sample_id <- sub("\\.wf.*", "", input_file)
+    setnames(vcf, old = sample_id, new = "GENOTYPE")
+  }
+
   vcf <- vcf[, !c("ID", "FORMAT", "INFO"), with = FALSE]
   
   # Replace "X" and "Y" chromosomes with numeric values for sorting (X=23, Y=24)
