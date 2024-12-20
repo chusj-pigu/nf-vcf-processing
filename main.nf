@@ -67,6 +67,13 @@ workflow {
             tuple('sv', file)  // Create a tuple with type 'sv' and file path
         }
     
+    str_ch = all_vcf_ch
+        .filter { file -> file.getName().contains('str.vcf') && (file.getName() =~ /.*\.vcf(\.gz)?$/) 
+            }  // Filter files with 'sv' and ending with '.vcf' or '.vcf.gz'
+        .map { file -> 
+            tuple('str', file)  // Create a tuple with type 'sv' and file path
+        }
+    
     tuples_vcf = cnv_spectre_ch
         .mix(cnv_qdnaseq_ch,snp_clin_ch, snp_ch, sv_ch)
         .branch {                               // Separate .gzip files to be decompressed
