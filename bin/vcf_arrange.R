@@ -357,6 +357,86 @@ qdnaseq_arrange <- function(vcf) {
   return(vcf)
 }
 
+str_arrange <- function(vcf) {
+  # Max values for splitting
+  max_info <- max(str_count(vcf$INFO, ";"), na.rm = TRUE) + 1
+  
+  # Split INFO column
+  info_cols <- paste0("info", seq_len(max_info))
+  vcf[, (info_cols) := tstrsplit(INFO, ";", fixed = TRUE)]
+  
+  # Extract and rename INFO columns
+  first_row <- vcf[1, ..info_cols]
+  new_names <- str_extract(first_row, "^[^=]+")
+  new_names[3] <- "REF_N"
+  setnames(vcf, old = info_cols, new = new_names)
+  
+  # Process INFO columns in-place
+  vcf[, (new_names) := lapply(.SD, function(col) gsub("[<>]", "", gsub("^[^=]+=", "", col))),
+      .SDcols = new_names]
+  
+  # Rename column that contains sample ID
+  if (any(str_detect(colnames(vcf), "reads"))) {
+    setnames(vcf, old = "reads", new = "SAMPLE")
+  } else {
+    sample_id <- sub("\\.wf.*", "", input_file)
+    setnames(vcf, old = sample_id, new = "SAMPLE")
+  }
+  
+  # Split FORMAT and sample columns
+  format_cols <- unique(unlist(str_split(vcf$FORMAT[1], ":", simplify = TRUE)))
+  vcf[, (format_cols) := tstrsplit(SAMPLE, ":", fixed = TRUE)]
+  
+  # Clean ALT column
+  vcf[, ALT := gsub("<STR_?([0-9]+)>", "Allele_comprised_of_\\1_repeat_units", ALT, perl = TRUE)]
+  
+  # Rename columns
+  rename_map <- c(
+    RL = "Reference_length_in_bp",
+    RU = "Repeat_unit_in_the_reference_orientation",
+    REPID = "REP_ID",
+    VARID = "VAR_ID",
+    STR_STATUS = "Repeat_expansion_status",
+    STR_NORMAL_MAX = "Max_number_of_repeats_allowed_to_call_as_normal",
+    STR_PATHOLOGIC_MIN = "Min_number_of_repeats_required_to_call_as_pathologic",
+    SO = "Type_of_reads_that_support_the_allele",
+    REPCN = "Number_of_repeat_units_spanned_by_the_allele",
+    GT = "Genotype",
+    REPCI = "Confidence_interval_for_REPCN",
+    ADSP = "Number_of_spanning_reads_consistent_with_the_allele",
+    LC = "Locus_coverage"
+  )
+  setnames(vcf, old = names(rename_map), new = unname(rename_map))
+
+  
+  # Remove specified columns
+  cols_to_remove <- c("QUAL", "ID", "INFO", "FORMAT", "SAMPLE")
+  vcf[, (cols_to_remove) := NULL]
+  
+  # Reorder and select columns
+  setcolorder(vcf, c(
+    "CHROM", "POS", "END", "REF", "ALT",
+    "Repeat_unit_in_the_reference_orientation", "REP_ID",
+    "Number_of_spanning_reads_consistent_with_the_allele",
+    "Locus_coverage"
+  ))
+  
+  # Process CHROM column for sorting
+  vcf[, CHROM := as.integer(gsub("^chr", "", CHROM))]
+  vcf[CHROM == "X", CHROM := 23]
+  vcf[CHROM == "Y", CHROM := 24]
+  
+  # Sort by CHROM and POS
+  setorder(vcf, CHROM, POS)
+  
+  # Restore CHROM formatting
+  vcf[, CHROM := paste0("chr", CHROM)]
+  vcf[CHROM == "chr23", CHROM := "chrX"]
+  vcf[CHROM == "chr24", CHROM := "chrY"]
+  
+  return(vcf)
+}
+
 # Assuming input_file is a path to a file and vcf is a data.table
 output_name <- gsub(".table", "_summary", input_file)
 
@@ -376,6 +456,9 @@ if (nrow(vcf) > 0) {
   } else if (str_detect(input_file, "qdnaseq")) {
     vcf_qdnaseq <- qdnaseq_arrange(vcf)  
     fwrite(vcf_qdnaseq, paste0(output_name, ".tsv"), sep = "\t")
+  } else if (str_detect(input_file, "str")) {
+    vcf_str <- str_arrange(vcf)
+    fwrite(vcf_tr, paste0(output_name, ".tsv"), sep = "\t")
   } else {
     vcf_snp <- snp_arrange(vcf, stjude_genes)
     fwrite(vcf_snp, paste0(output_name, ".tsv"), sep = "\t")
