@@ -23,7 +23,7 @@ This workflow outputs one `*_summary.tsv` per vcf file, and outputs two tsv file
 ### Parameters
 
 - `--in_dir`: Path to the directory containing VCF files to be processed.
-- `--stjude_list`: Path to a file containing a list of gene to filter SNP and SV VCF with, each gene must be separated by a newline [default: St-Jude panel].
+- `--bedgenes_list`: Path to a file containing a list of gene to filter SNP and SV VCF with, each gene must be separated by a newline [default: Panel used for adaptive samping].
 - `--cancer_genes`: Path to a file containing a list of genes to filter CNV files with when they are more than 100 rows long [default: path to a list of 1000s genes involved in cancers]
 - `-profile`: Use drac if running on Narval [default: standard].
 - `--out_dir`: Path to the directory that will store output files [default: same as `--in_dir`]
