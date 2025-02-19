@@ -8,7 +8,7 @@ def helpMessage() {
          --in_dir                       Path to the SV and/or CNV vcf file(s)
 
          Optional arguments:
-         --stjude_list                  Path to a file containing a list of gene to filter SNP and SV VCF with, each gene must be separated by a newline [default: St-Jude panel]
+         --bedgenes_list                Path to a file containing a list of gene to filter SNP and SV VCF with, each gene must be separated by a newline [default: Panel used for adaptive samping]
          --cancer_gene                  Path to a file containing a list of genes to filter CNV files with when they are more than 100 rows long [default: path to a list of 1000s genes involved in cancers]
          --out_dir                      Output directory [default: variants]
         """
@@ -26,7 +26,7 @@ include { PROCESS_VCF } from './subworkflows/process_vcf'
 workflow {
 
     // Create a channel for gene lists:
-    stjude_ch = Channel.fromPath(params.stjude_list)
+    bed_genes_ch = Channel.fromPath(params.bedgenes_list)
     cancer_ch = Channel.fromPath(params.cancer_genes)
 
     // Create a channel from all files in the specified directory
@@ -120,6 +120,6 @@ workflow {
             tuple(type, columns)
         }
 
-    PROCESS_VCF(tuples_vcf.gzip,tuples_vcf.raw,fields_ch,stjude_ch,cancer_ch)
+    PROCESS_VCF(tuples_vcf.gzip,tuples_vcf.raw,fields_ch,bed_genes_ch,cancer_ch)
 
 }

@@ -8,7 +8,7 @@ workflow PROCESS_VCF {
     gzip
     raw
     fields
-    stjude
+    bedgenes
     cancer
 
     main:
@@ -31,7 +31,7 @@ workflow PROCESS_VCF {
 
     tables_ch = gatk_table.out
         .mix(vcf_to_table.out)
-        .combine(stjude)
+        .combine(bedgenes)
         .combine(cancer)
 
 
