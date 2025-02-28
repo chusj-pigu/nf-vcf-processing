@@ -202,8 +202,7 @@ clinvar_arrange <- function(vcf, genes) {
         ALLELE_DEPTH, VAF, QUAL, FILTER, Annotation, Annotation_Impact, Gene_Name, 
         Feature_Type, Feature_ID, Transcript_BioType, Rank, HGVS.c, HGVS.p, 
         `cDNA.pos/cDNA.length`, `CDS.pos/CDS.length`, `AA.pos/AA.length`, Distance, 
-        `ERRORS/WARNINGS/INFO`, ALLELEID, SCIDNINCL, CLNREVSTAT, ONCREVSTAT, CLNDNINCL,
-        ONCDNINCL, SCIREVSTAT, CLNDN, ONCDN, SCIDN)
+        `ERRORS/WARNINGS/INFO`, CLNSIG,CLNHGVS,CLNDISDB,ALLELEID,SCIDNINCL,CLNREVSTAT,CLNDN)
     ]
   
     # Append filtered rows to the result data.table
